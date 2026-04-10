@@ -9,7 +9,7 @@ interface VerificationSummaryProps {
 
 export function VerificationSummary({ sessions, onExport, onNewSession }: VerificationSummaryProps) {
   const summaries = computeSummaries(sessions);
-  const hasClaimed = summaries.some(s => s.claimedLbs != null);
+  const hasClaimed = summaries.some(s => s.claimedLbs != null || s.claimedGrams != null);
 
   const grandUnits = summaries.reduce((s, r) => s + r.units, 0);
   const grandGrams = Math.round(summaries.reduce((s, r) => s + r.totalGrams, 0) * 10) / 10;
@@ -59,7 +59,8 @@ export function VerificationSummary({ sessions, onExport, onNewSession }: Verifi
                 <td className="px-2 py-2.5 text-right font-mono text-gray-300">{s.totalLbs.toFixed(2)}</td>
                 {hasClaimed && (
                   <td className="px-2 py-2.5 text-right font-mono text-gray-500">
-                    {s.claimedLbs != null ? s.claimedLbs.toFixed(2) : '—'}
+                    {s.claimedLbs != null ? `${s.claimedLbs.toFixed(2)} lbs` :
+                     s.claimedGrams != null ? `${s.claimedGrams.toFixed(1)} g` : '—'}
                   </td>
                 )}
                 {hasClaimed && (

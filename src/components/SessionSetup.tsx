@@ -21,14 +21,16 @@ export function SessionSetup({ onAddStrain, onStartWeighing, strains }: SessionS
 
     const pCount = partialCount ? parseInt(partialCount) : 0;
 
+    const claimed = claimedLbs ? parseFloat(claimedLbs) : null;
     onAddStrain({
       id: crypto.randomUUID(),
       strain: strain.trim(),
       type,
       totalUnits: parseInt(totalUnits),
-      claimedLbs: claimedLbs ? parseFloat(claimedLbs) : null,
+      claimedLbs: !isBagged && claimed != null ? claimed : null,
+      claimedGrams: isBagged && claimed != null ? claimed : null,
       partialCount: pCount,
-      partialSizeGrams: partialSize ? parseFloat(partialSize) : 226.8, // default ~1/2 lb
+      partialSizeGrams: partialSize ? parseFloat(partialSize) : 226.8,
     });
 
     setStrain('');
@@ -42,6 +44,9 @@ export function SessionSetup({ onAddStrain, onStartWeighing, strains }: SessionS
   const formatPartialLabel = (count: number, sizeGrams: number) => {
     return `${count} × ${sizeGrams}g`;
   };
+
+  const isBagged = type === 'Trim' || type === 'Popcorn';
+  const itemLabel = isBagged ? 'Bags' : 'Full Units';
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
@@ -57,11 +62,12 @@ export function SessionSetup({ onAddStrain, onStartWeighing, strains }: SessionS
                 <span className="font-medium text-gray-100">{s.strain}</span>
                 <div className="flex gap-4 text-xs text-gray-500 font-mono">
                   <span>{s.type}</span>
-                  <span>{s.totalUnits} full</span>
+                  <span>{s.totalUnits} {s.type === 'Trim' || s.type === 'Popcorn' ? 'bags' : 'units'}</span>
                   {s.partialCount > 0 && (
                     <span className="text-amber-400/70">{formatPartialLabel(s.partialCount, s.partialSizeGrams)}</span>
                   )}
                   {s.claimedLbs != null && <span>{s.claimedLbs} lbs</span>}
+                  {s.claimedGrams != null && <span>{s.claimedGrams}g claimed</span>}
                 </div>
               </div>
             ))}
@@ -107,7 +113,7 @@ export function SessionSetup({ onAddStrain, onStartWeighing, strains }: SessionS
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium uppercase tracking-widest text-gray-500 mb-1.5">Full Units</label>
+            <label className="block text-xs font-medium uppercase tracking-widest text-gray-500 mb-1.5">{itemLabel}</label>
             <input
               type="number"
               value={totalUnits}
@@ -120,15 +126,15 @@ export function SessionSetup({ onAddStrain, onStartWeighing, strains }: SessionS
           </div>
           <div>
             <label className="block text-xs font-medium uppercase tracking-widest text-gray-500 mb-1.5">
-              Claimed (LBS) <span className="text-gray-600 normal-case tracking-normal">optional</span>
+              {isBagged ? 'Claimed (g)' : 'Claimed (LBS)'} <span className="text-gray-600 normal-case tracking-normal">optional</span>
             </label>
             <input
               type="number"
               value={claimedLbs}
               onChange={e => setClaimedLbs(e.target.value)}
-              placeholder="76.78"
+              placeholder={isBagged ? '5000' : '76.78'}
               min="0"
-              step="0.01"
+              step={isBagged ? '1' : '0.01'}
               className="w-full px-3 py-2.5 bg-base-800 border border-base-600 rounded-lg text-gray-100 placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 font-mono"
             />
           </div>

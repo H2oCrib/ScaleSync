@@ -1,24 +1,40 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useScale } from './hooks/useScale';
 import { ScaleConnection } from './components/ScaleConnection';
+import { ModeSelect } from './components/ModeSelect';
 import { SessionSetup } from './components/SessionSetup';
 import { WeighingStation } from './components/WeighingStation';
 import { VerificationSummary } from './components/VerificationSummary';
+import { WetSetup } from './components/WetSetup';
+import { WetWeighingStation } from './components/WetWeighingStation';
+import { WetSummary } from './components/WetSummary';
 import { exportExcel } from './lib/export';
-import type { AppPhase, ScaleReading, StrainConfig, StrainSession, WeightReading } from './lib/types';
+import { exportWetExcel } from './lib/wet-export';
+import type {
+  AppPhase, ScaleReading, StrainConfig, StrainSession, WeightReading,
+  WorkflowMode, HarvestBatchConfig, HarvestSession, WetWeightReading,
+} from './lib/types';
 
 function App() {
   const scale = useScale();
   const [phase, setPhase] = useState<AppPhase>('connect');
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode | null>(null);
+
+  // Dry weight state
   const [strainConfigs, setStrainConfigs] = useState<StrainConfig[]>([]);
   const [sessions, setSessions] = useState<StrainSession[]>([]);
   const [activeSessionIndex, setActiveSessionIndex] = useState(0);
+
+  // Wet weight state
+  const [harvestSession, setHarvestSession] = useState<HarvestSession | null>(null);
+
+  // Demo mode
   const [demoMode, setDemoMode] = useState(false);
   const [demoReading, setDemoReading] = useState<ScaleReading | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (demoMode && phase === 'weighing') {
+    if (demoMode && (phase === 'weighing' || phase === 'wetWeighing')) {
       demoIntervalRef.current = window.setInterval(() => {
         const base = 400 + Math.random() * 100;
         setDemoReading({
@@ -32,22 +48,32 @@ function App() {
     }
   }, [demoMode, phase]);
 
+  // ── Connection ──
   const handleDemoMode = () => {
     setDemoMode(true);
-    setPhase('setup');
+    setPhase('modeSelect');
   };
 
   const handleConnect = async () => {
     await scale.connect();
-    setPhase('setup');
+    setPhase('modeSelect');
   };
 
   const handleDisconnect = async () => {
     await scale.disconnect();
     setDemoMode(false);
+    setWorkflowMode(null);
+    setHarvestSession(null);
     setPhase('connect');
   };
 
+  // ── Mode Selection ──
+  const handleSelectMode = (mode: WorkflowMode) => {
+    setWorkflowMode(mode);
+    setPhase(mode === 'dry' ? 'setup' : 'wetSetup');
+  };
+
+  // ── Dry Weight Handlers ──
   const handleAddStrain = (config: StrainConfig) => {
     setStrainConfigs(prev => [...prev, config]);
   };
@@ -112,24 +138,60 @@ function App() {
     setStrainConfigs([]);
     setSessions([]);
     setActiveSessionIndex(0);
-    setPhase('setup');
+    setPhase('modeSelect');
+  };
+
+  // ── Wet Weight Handlers ──
+  const handleStartWetWeighing = async (config: HarvestBatchConfig) => {
+    setHarvestSession({ config, readings: [], completed: false });
+    setPhase('wetWeighing');
+    await scale.startContinuous();
+  };
+
+  const handleRecordPlant = useCallback((reading: WetWeightReading) => {
+    setHarvestSession(prev => prev ? {
+      ...prev,
+      readings: [...prev.readings, reading],
+    } : prev);
+  }, []);
+
+  const handleUpdateWetReadings = useCallback((readings: WetWeightReading[]) => {
+    setHarvestSession(prev => prev ? { ...prev, readings } : prev);
+  }, []);
+
+  const handleFinishHarvest = async () => {
+    await scale.stopContinuous();
+    setHarvestSession(prev => prev ? { ...prev, completed: true } : prev);
+    setPhase('wetSummary');
+  };
+
+  const handleWetExport = () => {
+    if (harvestSession) exportWetExcel(harvestSession);
+  };
+
+  const handleWetNewSession = () => {
+    setHarvestSession(null);
+    setPhase('modeSelect');
   };
 
   const activeSession = sessions[activeSessionIndex];
   const isConnected = scale.connected || demoMode;
+
+  const headerTitle = workflowMode === 'wet' ? 'WET WEIGHT HARVEST' : 'WEIGHT VERIFICATION';
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Connection Status Strip */}
       <div className={`h-0.5 transition-colors duration-500 ${
         !isConnected ? 'bg-base-700' :
-        demoMode ? 'bg-amber-500' : 'bg-cyan-500'
+        demoMode ? 'bg-amber-500' :
+        workflowMode === 'wet' ? 'bg-green-500' : 'bg-cyan-500'
       }`} />
 
       {/* Header */}
       <header className="bg-base-900 border-b border-base-700 px-5 py-2.5 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-semibold text-gray-200 tracking-wide">WEIGHT VERIFICATION</h1>
+          <h1 className="text-sm font-semibold text-gray-200 tracking-wide">{headerTitle}</h1>
           <span className="text-[10px] font-mono bg-base-800 text-gray-500 px-2 py-0.5 rounded border border-base-700">
             VALOR 7000
           </span>
@@ -137,8 +199,8 @@ function App() {
         <div className="flex items-center gap-4">
           {isConnected && (
             <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${demoMode ? 'bg-amber-400' : 'bg-cyan-400'}`} />
-              <span className={`text-xs font-medium uppercase tracking-wider ${demoMode ? 'text-amber-400' : 'text-cyan-400'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${demoMode ? 'bg-amber-400' : workflowMode === 'wet' ? 'bg-green-400' : 'bg-cyan-400'}`} />
+              <span className={`text-xs font-medium uppercase tracking-wider ${demoMode ? 'text-amber-400' : workflowMode === 'wet' ? 'text-green-400' : 'text-cyan-400'}`}>
                 {demoMode ? 'Demo' : 'Live'}
               </span>
             </div>
@@ -160,6 +222,14 @@ function App() {
             onDisconnect={handleDisconnect}
             onDemoMode={handleDemoMode}
             error={scale.error}
+          />
+        )}
+
+        {phase === 'modeSelect' && (
+          <ModeSelect
+            onSelectMode={handleSelectMode}
+            onDisconnect={handleDisconnect}
+            demoMode={demoMode}
           />
         )}
 
@@ -190,7 +260,35 @@ function App() {
             sessions={sessions}
             onExport={handleExport}
             onNewSession={handleNewSession}
+          />
+        )}
 
+        {phase === 'wetSetup' && (
+          <WetSetup
+            onStartWeighing={handleStartWetWeighing}
+            onBack={() => setPhase('modeSelect')}
+          />
+        )}
+
+        {phase === 'wetWeighing' && harvestSession && (
+          <WetWeighingStation
+            session={harvestSession}
+            currentReading={demoMode ? demoReading : scale.currentReading}
+            onRecordPlant={handleRecordPlant}
+            onUpdateReadings={handleUpdateWetReadings}
+            onFinish={handleFinishHarvest}
+            onTare={demoMode ? async () => {} : scale.tare}
+            onZero={demoMode ? async () => {} : scale.zero}
+            onStartContinuous={demoMode ? async () => {} : scale.startContinuous}
+            onStopContinuous={demoMode ? async () => {} : scale.stopContinuous}
+          />
+        )}
+
+        {phase === 'wetSummary' && harvestSession && (
+          <WetSummary
+            session={harvestSession}
+            onExport={handleWetExport}
+            onNewSession={handleWetNewSession}
           />
         )}
       </main>

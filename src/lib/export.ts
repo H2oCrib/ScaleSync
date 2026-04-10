@@ -1,13 +1,22 @@
 import ExcelJS from 'exceljs';
 import type { StrainSession, StrainSummary } from './types';
 import { GRAMS_PER_LB, VERIFICATION_TOLERANCE_GRAMS } from './types';
+import {
+  NAVY, LIGHT_BLUE, LIGHT_GRAY, GREEN_FILL, RED_FILL, STRAIN_HEADER,
+  THIN_BORDER, BOLD_FONT, HEADER_FONT, TITLE_FONT,
+} from './excel-styles';
 
 export function computeSummaries(sessions: StrainSession[]): StrainSummary[] {
   return sessions.map(s => {
     const totalGrams = s.readings.reduce((sum, r) => sum + r.weightGrams, 0);
     const totalLbs = totalGrams / GRAMS_PER_LB;
-    const hasClaimed = s.config.claimedLbs != null;
-    const differenceGrams = hasClaimed ? totalGrams - s.config.claimedLbs! * GRAMS_PER_LB : null;
+
+    // Determine claimed in grams for comparison
+    let claimedInGrams: number | null = null;
+    if (s.config.claimedLbs != null) claimedInGrams = s.config.claimedLbs * GRAMS_PER_LB;
+    else if (s.config.claimedGrams != null) claimedInGrams = s.config.claimedGrams;
+
+    const differenceGrams = claimedInGrams != null ? totalGrams - claimedInGrams : null;
 
     const fullCount = s.readings.filter(r => !r.isPartial).length;
     const partialReadings = s.readings.filter(r => r.isPartial);
@@ -21,6 +30,7 @@ export function computeSummaries(sessions: StrainSession[]): StrainSummary[] {
       totalGrams: Math.round(totalGrams * 10) / 10,
       totalLbs: Math.round(totalLbs * 100) / 100,
       claimedLbs: s.config.claimedLbs,
+      claimedGrams: s.config.claimedGrams,
       differenceGrams: differenceGrams != null ? Math.round(differenceGrams * 10) / 10 : null,
       status: differenceGrams != null
         ? (Math.abs(differenceGrams) <= VERIFICATION_TOLERANCE_GRAMS ? 'VERIFIED' : 'VARIANCE')
@@ -29,25 +39,6 @@ export function computeSummaries(sessions: StrainSession[]): StrainSummary[] {
   });
 }
 
-// Style constants
-const NAVY: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2A4A' } };
-const LIGHT_BLUE: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6E4F0' } };
-const LIGHT_GRAY: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-const GREEN_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
-const RED_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
-const STRAIN_HEADER: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
-
-const THIN_BORDER: Partial<ExcelJS.Borders> = {
-  top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-  left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-  bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-  right: { style: 'thin', color: { argb: 'FFD0D0D0' } },
-};
-
-const BOLD_FONT: Partial<ExcelJS.Font> = { bold: true, name: 'Calibri', size: 11 };
-const HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FFFFFFFF' } };
-const TITLE_FONT: Partial<ExcelJS.Font> = { bold: true, name: 'Calibri', size: 16 };
-
 export async function exportExcel(sessions: StrainSession[]) {
   const summaries = computeSummaries(sessions);
   const wb = new ExcelJS.Workbook();
@@ -55,13 +46,13 @@ export async function exportExcel(sessions: StrainSession[]) {
   wb.created = new Date();
 
   // Determine if ANY strain has claimed weight
-  const hasClaimed = summaries.some(s => s.claimedLbs != null);
+  const hasClaimed = summaries.some(s => s.claimedLbs != null || s.claimedGrams != null);
 
   // Build dynamic columns
   const headers: string[] = ['Strain', 'Type', 'Units', 'Total (g)', 'Total (LBS)'];
   const colWidths: number[] = [18, 10, 8, 12, 12];
   if (hasClaimed) {
-    headers.push('Claimed (LBS)', 'Difference (g)', 'Status');
+    headers.push('Claimed', 'Difference (g)', 'Status');
     colWidths.push(14, 14, 16);
   }
   const colCount = headers.length;
@@ -110,10 +101,16 @@ export async function exportExcel(sessions: StrainSession[]) {
     row.getCell(5).numFmt = '#,##0.00';
 
     if (hasClaimed) {
-      row.getCell(6).value = s.claimedLbs ?? '';
+      // Show claimed in the right unit
+      if (s.claimedLbs != null) {
+        row.getCell(6).value = `${s.claimedLbs} lbs`;
+      } else if (s.claimedGrams != null) {
+        row.getCell(6).value = `${s.claimedGrams} g`;
+      } else {
+        row.getCell(6).value = '';
+      }
       row.getCell(7).value = s.differenceGrams ?? '';
       row.getCell(8).value = s.status ?? 'N/A';
-      if (s.claimedLbs != null) row.getCell(6).numFmt = '#,##0.00';
       if (s.differenceGrams != null) row.getCell(7).numFmt = '+#,##0.0;-#,##0.0;0.0';
     }
 
@@ -159,13 +156,11 @@ export async function exportExcel(sessions: StrainSession[]) {
   grandRow.getCell(5).numFmt = '#,##0.00';
 
   if (hasClaimed) {
-    const claimedSummaries = summaries.filter(s => s.claimedLbs != null);
     const diffSummaries = summaries.filter(s => s.differenceGrams != null);
     const verifiableSummaries = summaries.filter(s => s.status != null);
 
-    grandRow.getCell(6).value = claimedSummaries.length > 0
-      ? Math.round(claimedSummaries.reduce((s, r) => s + r.claimedLbs!, 0) * 100) / 100
-      : '';
+    // Grand total claimed — mixed units, just leave blank
+    grandRow.getCell(6).value = '';
     grandRow.getCell(7).value = diffSummaries.length > 0
       ? Math.round(diffSummaries.reduce((s, r) => s + r.differenceGrams!, 0) * 10) / 10
       : '';
@@ -175,7 +170,6 @@ export async function exportExcel(sessions: StrainSession[]) {
       ? (allVerified ? 'ALL VERIFIED' : 'HAS VARIANCE')
       : '';
 
-    if (claimedSummaries.length > 0) grandRow.getCell(6).numFmt = '#,##0.00';
     if (diffSummaries.length > 0) grandRow.getCell(7).numFmt = '+#,##0.0;-#,##0.0;0.0';
 
     // Grand total status styling

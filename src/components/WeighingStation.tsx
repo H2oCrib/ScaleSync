@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { ScaleReading, StrainSession, WeightReading } from '../lib/types';
-import { GRAMS_PER_LB } from '../lib/types';
+import { GRAMS_PER_LB, isBaggedType } from '../lib/types';
 import { useAutoCapture } from '../hooks/useAutoCapture';
 import { useAudio } from '../hooks/useAudio';
 import { WeightGrid } from './WeightGrid';
@@ -32,6 +32,10 @@ export function WeighingStation({
   const [continuousActive, setContinuousActive] = useState(false);
   const { playCapture, playComplete } = useAudio();
 
+  const isBagged = isBaggedType(session.config.type);
+  const itemLabel = isBagged ? 'Bag' : 'Unit';
+  const itemsLabel = isBagged ? 'bags' : 'units';
+
   const fullUnits = session.config.totalUnits;
   const partialCount = session.config.partialCount || 0;
   const partialSizeGrams = session.config.partialSizeGrams || 226.8;
@@ -46,8 +50,10 @@ export function WeighingStation({
   const runningTotalGrams = session.readings.reduce((sum, r) => sum + r.weightGrams, 0);
   const runningTotalLbs = runningTotalGrams / GRAMS_PER_LB;
 
-  const hasClaimed = session.config.claimedLbs != null;
-  const claimedGrams = hasClaimed ? session.config.claimedLbs! * GRAMS_PER_LB : 0;
+  const hasClaimed = session.config.claimedLbs != null || session.config.claimedGrams != null;
+  const claimedGrams = session.config.claimedLbs != null
+    ? session.config.claimedLbs * GRAMS_PER_LB
+    : session.config.claimedGrams ?? 0;
   const tolerancePercent = hasClaimed && claimedGrams > 0
     ? ((runningTotalGrams - claimedGrams) / claimedGrams) * 100
     : null;
@@ -135,7 +141,7 @@ export function WeighingStation({
             {isPartialPhase ? (
               <span className="text-amber-400/80">Partial {nextItem - fullUnits} of {partialCount} ({partialLabel})</span>
             ) : (
-              <>Unit {Math.min(nextItem, fullUnits)} of {fullUnits}{partialCount > 0 && ` + ${partialCount} partials`}</>
+              <>{itemLabel} {Math.min(nextItem, fullUnits)} of {fullUnits}{partialCount > 0 && ` + ${partialCount} partials`}</>
             )}
           </p>
         </div>
@@ -228,8 +234,14 @@ export function WeighingStation({
             )}
           </div>
           <div className="flex justify-between mt-1">
-            <span className="text-[10px] text-gray-600 font-mono">{runningTotalLbs.toFixed(2)} lbs actual</span>
-            <span className="text-[10px] text-gray-600 font-mono">{session.config.claimedLbs!.toFixed(2)} lbs claimed</span>
+            <span className="text-[10px] text-gray-600 font-mono">
+              {isBagged ? `${runningTotalGrams.toFixed(1)} g actual` : `${runningTotalLbs.toFixed(2)} lbs actual`}
+            </span>
+            <span className="text-[10px] text-gray-600 font-mono">
+              {session.config.claimedGrams != null
+                ? `${session.config.claimedGrams.toFixed(1)} g claimed`
+                : `${session.config.claimedLbs!.toFixed(2)} lbs claimed`}
+            </span>
           </div>
         </div>
       )}
@@ -270,7 +282,7 @@ export function WeighingStation({
       {allDone && (
         <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4 text-center">
           <p className="text-green-400 font-medium text-sm uppercase tracking-wider">
-            All {fullUnits} units{partialCount > 0 && ` + ${partialCount} partials`} weighed
+            All {fullUnits} {itemsLabel}{partialCount > 0 && ` + ${partialCount} partials`} weighed
           </p>
         </div>
       )}
@@ -287,7 +299,7 @@ export function WeighingStation({
             <p className="text-lg font-mono font-medium text-gray-100 tabular-nums">{runningTotalLbs.toFixed(2)}</p>
           </div>
           <div className="bg-base-900 border border-base-700 rounded-lg p-3 text-center">
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-500 mb-1">Avg / Unit</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-gray-500 mb-1">Avg / {itemLabel}</p>
             <p className="text-lg font-mono font-medium text-gray-100 tabular-nums">
               {(runningTotalGrams / session.readings.length).toFixed(1)}
             </p>
@@ -306,7 +318,7 @@ export function WeighingStation({
               : 'bg-base-800 hover:bg-base-700 text-gray-400 border-base-600'
           }`}
         >
-          Finish Strain {!allDone && `(${session.readings.length}/${totalItems})`}
+          Finish Strain {!allDone && `(${session.readings.length}/${totalItems} ${itemsLabel})`}
         </button>
       </div>
     </div>
