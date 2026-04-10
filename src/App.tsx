@@ -47,14 +47,37 @@ function MainApp() {
   const [demoReading, setDemoReading] = useState<ScaleReading | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
 
+  const demoTargetRef = useRef(450);
+  const demoTickRef = useRef(0);
+
   useEffect(() => {
     if (demoMode && (phase === 'weighing' || phase === 'wetWeighing')) {
+      // Pick a new target weight each time we enter weighing
+      demoTargetRef.current = 300 + Math.random() * 300;
+      demoTickRef.current = 0;
+
       demoIntervalRef.current = window.setInterval(() => {
-        const base = 400 + Math.random() * 100;
+        demoTickRef.current++;
+        const tick = demoTickRef.current;
+        const target = demoTargetRef.current;
+
+        // First few ticks: fluctuate, then settle to stable target
+        let weight: number;
+        let stable: boolean;
+        if (tick <= 3) {
+          // Settling — jitter around target
+          weight = target + (Math.random() - 0.5) * 20;
+          stable = false;
+        } else {
+          // Stable — exact same value every time
+          weight = target;
+          stable = true;
+        }
+
         setDemoReading({
-          weight: Math.round(base * 10) / 10,
+          weight: Math.round(weight * 10) / 10,
           unit: 'g',
-          stable: Math.random() > 0.3,
+          stable,
           mode: 'G',
         });
       }, 500);
@@ -113,7 +136,11 @@ function MainApp() {
       };
       return updated;
     });
-  }, [activeSessionIndex]);
+    if (demoMode) {
+      demoTargetRef.current = 300 + Math.random() * 300;
+      demoTickRef.current = 0;
+    }
+  }, [activeSessionIndex, demoMode]);
 
   const handleUpdateReadings = useCallback((readings: WeightReading[]) => {
     setSessions(prev => {
@@ -167,7 +194,12 @@ function MainApp() {
       ...prev,
       readings: [...prev.readings, reading],
     } : prev);
-  }, []);
+    // Reset demo to simulate next plant (new weight, settling first)
+    if (demoMode) {
+      demoTargetRef.current = 300 + Math.random() * 300;
+      demoTickRef.current = 0;
+    }
+  }, [demoMode]);
 
   const handleUpdateWetReadings = useCallback((readings: WetWeightReading[]) => {
     setHarvestSession(prev => prev ? { ...prev, readings } : prev);

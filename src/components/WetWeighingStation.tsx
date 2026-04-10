@@ -4,6 +4,7 @@ import { GRAMS_PER_LB } from '../lib/types';
 import { useAutoCapture } from '../hooks/useAutoCapture';
 import { useAudio } from '../hooks/useAudio';
 import { useScannerRelay } from '../hooks/useScannerRelay';
+import { useUSBScanner } from '../hooks/useUSBScanner';
 
 interface WetWeighingStationProps {
   session: HarvestSession;
@@ -41,25 +42,19 @@ export function WetWeighingStation({
   const scanInputRef = useRef<HTMLInputElement>(null);
   const { playCapture, playComplete, playError } = useAudio();
 
-  // Scanner relay — receives tags from C72 via WebSocket
-  const handleRelayTag = useCallback((tagId: string) => {
-    // Same logic as handleTagSubmit but triggered remotely
-    const isDuplicate = session.readings.some(r => r.tagId === tagId);
-    if (isDuplicate) {
-      setDuplicateAlert(tagId);
-      playError();
-      setTimeout(() => setDuplicateAlert(null), 3000);
-      return;
-    }
-    setScannedTag(tagId);
-    setTagInput('');
-    setAwaitingWeight(true);
-    setDuplicateAlert(null);
-  }, [session.readings, playError]);
+  // Scanner relay ref — set after useAutoCapture so resetAutoCapture is available
+  const relayTagHandlerRef = useRef<(tagId: string) => void>(() => {});
 
   const { connected: scannerRelayConnected } = useScannerRelay({
     enabled: true,
-    onTagReceived: handleRelayTag,
+    onTagReceived: (tagId: string) => relayTagHandlerRef.current(tagId),
+  });
+
+  // USB barcode scanner detection (rapid keystroke pattern)
+  const { connected: usbScannerConnected } = useUSBScanner({
+    inputRef: scanInputRef,
+    onScan: () => {}, // Detection only — input handled by form submit
+    enabled: true,
   });
 
   const totalPlants = session.config.strains.reduce((sum, s) => sum + s.plantCount, 0);
@@ -126,11 +121,27 @@ export function WetWeighingStation({
     }
   }, [awaitingWeight, allDone, scannedTag, selectedStrain, nextPlant, totalPlants, onRecordPlant, playCapture, playComplete, rapidMode]);
 
-  const { armed } = useAutoCapture({
+  const { armed, reset: resetAutoCapture } = useAutoCapture({
     enabled: autoMode && awaitingWeight && !allDone,
     currentReading,
     onCapture: handleCapture,
   });
+
+  // Update relay handler now that resetAutoCapture is available
+  relayTagHandlerRef.current = (tagId: string) => {
+    const isDuplicate = session.readings.some(r => r.tagId === tagId);
+    if (isDuplicate) {
+      setDuplicateAlert(tagId);
+      playError();
+      setTimeout(() => setDuplicateAlert(null), 3000);
+      return;
+    }
+    setScannedTag(tagId);
+    setTagInput('');
+    setAwaitingWeight(true);
+    setDuplicateAlert(null);
+    resetAutoCapture();
+  };
 
   const handleTagSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,6 +163,7 @@ export function WetWeighingStation({
     setTagInput('');
     setAwaitingWeight(true);
     setDuplicateAlert(null);
+    resetAutoCapture();
   };
 
   const handleManualRecord = useCallback(() => {
@@ -218,12 +230,25 @@ export function WetWeighingStation({
           <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
             <span>Plant {Math.min(nextPlant, totalPlants)} of {totalPlants}</span>
             {!singleStrain && <><span>&middot;</span><span>{session.config.strains.length} strains</span></>}
+            {(scannerRelayConnected || usbScannerConnected) && <span>&middot;</span>}
             {scannerRelayConnected && (
+              <span className="flex items-center gap-1 text-green-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                C72
+              </span>
+            )}
+            {usbScannerConnected && (
+              <span className="flex items-center gap-1 text-cyan-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block" />
+                USB
+              </span>
+            )}
+            {!scannerRelayConnected && !usbScannerConnected && (
               <>
                 <span>&middot;</span>
-                <span className="flex items-center gap-1 text-green-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                  C72
+                <span className="flex items-center gap-1 text-gray-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-600 inline-block" />
+                  No Scanner
                 </span>
               </>
             )}
@@ -331,7 +356,7 @@ export function WetWeighingStation({
                 type="text"
                 value={tagInput}
                 onChange={e => setTagInput(e.target.value)}
-                placeholder={awaitingWeight ? 'Capturing weight...' : 'Scan METRC tag...'}
+                placeholder={awaitingWeight ? 'Capturing weight...' : usbScannerConnected ? 'Ready — scan next tag...' : 'Scan METRC tag or type ID...'}
                 disabled={awaitingWeight}
                 className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-base-800 border border-base-600 rounded-lg text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-500/50 font-mono text-base sm:text-lg text-center disabled:opacity-50 disabled:cursor-wait"
                 autoFocus
