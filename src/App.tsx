@@ -5,6 +5,7 @@ import { ModeSelect } from './components/ModeSelect';
 import { SessionSetup } from './components/SessionSetup';
 import { WeighingStation } from './components/WeighingStation';
 import { VerificationSummary } from './components/VerificationSummary';
+import { ScannerGuide } from './components/ScannerGuide';
 import { WetSetup } from './components/WetSetup';
 import { WetWeighingStation } from './components/WetWeighingStation';
 import { WetSummary } from './components/WetSummary';
@@ -70,7 +71,7 @@ function App() {
   // ── Mode Selection ──
   const handleSelectMode = (mode: WorkflowMode) => {
     setWorkflowMode(mode);
-    setPhase(mode === 'dry' ? 'setup' : 'wetSetup');
+    setPhase(mode === 'dry' ? 'setup' : 'scannerGuide');
   };
 
   // ── Dry Weight Handlers ──
@@ -263,10 +264,17 @@ function App() {
           />
         )}
 
+        {phase === 'scannerGuide' && (
+          <ScannerGuide
+            onContinue={() => setPhase('wetSetup')}
+            onBack={() => setPhase('modeSelect')}
+          />
+        )}
+
         {phase === 'wetSetup' && (
           <WetSetup
             onStartWeighing={handleStartWetWeighing}
-            onBack={() => setPhase('modeSelect')}
+            onBack={() => setPhase('scannerGuide')}
           />
         )}
 
