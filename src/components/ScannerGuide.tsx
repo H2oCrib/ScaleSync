@@ -49,6 +49,8 @@ export function ScannerHowTo() {
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center justify-between px-3 sm:px-5 py-3 hover:bg-base-800/50 transition-colors"
+        aria-expanded={expanded}
+        aria-label="Scanner setup and test"
       >
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-300">Scanner Setup & Test</span>

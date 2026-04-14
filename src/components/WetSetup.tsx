@@ -140,7 +140,7 @@ export function WetSetup({ onStartWeighing, onLoadSession, onBack }: WetSetupPro
                   <span className="text-xs text-gray-500 font-mono">{s.plantCount} plants</span>
                   <button
                     onClick={() => handleRemoveStrain(s.id)}
-                    className="text-gray-600 hover:text-red-400 transition-colors text-xs"
+                    className="text-gray-600 hover:text-red-400 hover:underline transition-colors text-xs"
                   >
                     Remove
                   </button>

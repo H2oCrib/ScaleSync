@@ -260,34 +260,30 @@ function MainApp() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Connection Status Strip */}
-      <div className={`h-0.5 transition-colors duration-500 ${
-        !isConnected ? 'bg-base-700' :
-        demoMode ? 'bg-amber-500' :
-        workflowMode === 'wet' ? 'bg-green-500' : 'bg-cyan-500'
-      }`} />
-
-      {/* Header */}
-      <header className="bg-base-900 border-b border-base-700 px-5 py-2.5 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-semibold text-gray-200 tracking-wide">{headerTitle}</h1>
-          <span className="text-[10px] font-mono bg-base-800 text-gray-500 px-2 py-0.5 rounded border border-base-700">
-            VALOR 7000
+      {/* Header — minimal top bar */}
+      <header className={`px-4 py-2 flex justify-between items-center border-b transition-colors duration-500 ${
+        !isConnected ? 'border-base-800 bg-base-950' :
+        demoMode ? 'border-amber-500/20 bg-base-950' :
+        workflowMode === 'wet' ? 'border-green-500/20 bg-base-950' : 'border-cyan-500/20 bg-base-950'
+      }`}>
+        <div className="flex items-center gap-2">
+          {isConnected && (
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              demoMode ? 'bg-amber-400' : workflowMode === 'wet' ? 'bg-green-400' : 'bg-cyan-400'
+            }`} />
+          )}
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em]">
+            {headerTitle}
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          {isConnected && (
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${demoMode ? 'bg-amber-400' : workflowMode === 'wet' ? 'bg-green-400' : 'bg-cyan-400'}`} />
-              <span className={`text-xs font-medium uppercase tracking-wider ${demoMode ? 'text-amber-400' : workflowMode === 'wet' ? 'text-green-400' : 'text-cyan-400'}`}>
-                {demoMode ? 'Demo' : 'Live'}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center gap-3">
           {phase === 'weighing' && activeSession && sessions.length > 1 && (
-            <span className="text-xs font-mono text-gray-500">
+            <span className="text-[10px] font-mono text-gray-600">
               {activeSessionIndex + 1}/{sessions.length}
             </span>
+          )}
+          {demoMode && (
+            <span className="text-[10px] font-mono text-amber-500/70 uppercase tracking-wider">Demo</span>
           )}
         </div>
       </header>

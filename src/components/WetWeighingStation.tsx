@@ -299,28 +299,15 @@ export function WetWeighingStation({
           <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
             <span>Plant {Math.min(nextPlant, totalPlants)} of {totalPlants}</span>
             {!singleStrain && <><span>&middot;</span><span>{session.config.strains.length} strains</span></>}
-            {(scannerRelayConnected || usbScannerConnected) && <span>&middot;</span>}
-            {scannerRelayConnected && (
-              <span className="flex items-center gap-1 text-green-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                C72
-              </span>
-            )}
-            {usbScannerConnected && (
-              <span className="flex items-center gap-1 text-cyan-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block" />
-                USB
-              </span>
-            )}
-            {!scannerRelayConnected && !usbScannerConnected && (
-              <>
-                <span>&middot;</span>
-                <span className="flex items-center gap-1 text-gray-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-600 inline-block" />
-                  No Scanner
-                </span>
-              </>
-            )}
+            <span>&middot;</span>
+            <span className={`flex items-center gap-1 ${currentReading ? 'text-green-500' : 'text-gray-600'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${currentReading ? 'bg-green-500' : 'bg-gray-600'}`} />
+              Scale
+            </span>
+            <span className={`flex items-center gap-1 ${usbScannerConnected ? 'text-green-500' : 'text-gray-600'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${usbScannerConnected ? 'bg-green-500' : 'bg-gray-600'}`} />
+              Scanner
+            </span>
           </div>
         </div>
         <div className="flex gap-1.5 sm:gap-2 shrink-0">
