@@ -10,6 +10,7 @@ import { ScannerPortal } from './components/ScannerPortal';
 import { WetSetup } from './components/WetSetup';
 import { WetWeighingStation } from './components/WetWeighingStation';
 import { WetSummary } from './components/WetSummary';
+import { UserGuide } from './components/UserGuide';
 import { exportExcel } from './lib/export';
 import { exportWetExcel } from './lib/wet-export';
 import { loadSession, clearSession, createDebouncedSave } from './lib/session-persistence';
@@ -49,6 +50,19 @@ function MainApp() {
   const demoIntervalRef = useRef<number | null>(null);
 
   const [sessionRestored, setSessionRestored] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  // Global ? shortcut to open guide
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '?' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setGuideOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const debouncedSave = useMemo(() => createDebouncedSave(300), []);
 
@@ -292,8 +306,18 @@ function MainApp() {
           {demoMode && (
             <span className="text-[10px] font-mono text-amber-500/70 uppercase tracking-wider">Demo</span>
           )}
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="w-6 h-6 rounded-full border border-base-600 hover:border-gray-400 text-gray-500 hover:text-gray-300 text-xs font-medium transition-colors flex items-center justify-center"
+            aria-label="Open user guide"
+            title="User guide (?)"
+          >
+            ?
+          </button>
         </div>
       </header>
+
+      <UserGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       {/* Session Restored Toast */}
       {sessionRestored && (
