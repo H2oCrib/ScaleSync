@@ -118,8 +118,15 @@ function MainApp() {
 
   const handleConnect = async () => {
     await scale.connect();
-    setPhase('modeSelect');
+    // Only advance if actually connected (user didn't cancel picker)
   };
+
+  // Auto-advance when scale connects
+  useEffect(() => {
+    if (scale.connected && phase === 'connect') {
+      setPhase('modeSelect');
+    }
+  }, [scale.connected, phase]);
 
   const handleDisconnect = async () => {
     await scale.disconnect();
