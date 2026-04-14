@@ -1,6 +1,7 @@
 import type { HarvestSession, WorkflowMode, AppPhase } from './types';
 
-const STORAGE_KEY = 'ohause-wet-session';
+const STORAGE_KEY = 'scalesync-session';
+const LEGACY_STORAGE_KEY = 'ohause-wet-session';
 
 interface SavedState {
   harvestSession: HarvestSession;
@@ -49,7 +50,16 @@ export function loadSession(): {
   phase: AppPhase;
 } | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Migrate legacy key if present
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        localStorage.setItem(STORAGE_KEY, legacy);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        raw = legacy;
+      }
+    }
     if (!raw) return null;
 
     const state = JSON.parse(raw) as SavedState;
@@ -80,6 +90,7 @@ export function loadSession(): {
 export function clearSession(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
     // silent
   }

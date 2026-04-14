@@ -263,7 +263,7 @@ function MainApp() {
   const activeSession = sessions[activeSessionIndex];
   const isConnected = scale.connected || demoMode;
 
-  const headerTitle = workflowMode === 'wet' ? 'WET WEIGHT HARVEST' : 'WEIGHT VERIFICATION';
+  const headerTitle = workflowMode === 'wet' ? 'SCALESYNC — HARVEST' : workflowMode === 'dry' ? 'SCALESYNC — VERIFY' : 'SCALESYNC';
 
   return (
     <div className="min-h-screen flex flex-col">

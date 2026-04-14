@@ -1,4 +1,4 @@
-# OHAUS Weight Verification System
+# ScaleSync
 
 A web app for cannabis facilities to verify weights using an OHAUS Valor 7000 scale connected via USB/RS-232. Supports two workflows:
 

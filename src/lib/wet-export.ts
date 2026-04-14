@@ -26,7 +26,7 @@ function computeHarvestSummaries(session: HarvestSession): HarvestSummary[] {
 export async function exportWetExcel(session: HarvestSession) {
   const summaries = computeHarvestSummaries(session);
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Wet Weight Harvest System';
+  wb.creator = 'ScaleSync';
   wb.created = new Date();
 
   const headers = ['Strain', 'Expected', 'Weighed', 'Total (g)', 'Total (LBS)', 'Avg / Plant (g)'];

@@ -30,7 +30,7 @@ export function VerificationSummary({ sessions, onExport, onNewSession }: Verifi
     <div className="max-w-5xl mx-auto py-8 px-4">
       <div className="text-center mb-6">
         <p className="text-xs font-medium uppercase tracking-widest text-gray-500 mb-1">Report</p>
-        <h2 className="text-3xl font-semibold text-gray-50 mb-1">Weight Verification Summary</h2>
+        <h2 className="text-3xl font-semibold text-gray-50 mb-1">Dry Weight Summary</h2>
         <p className="text-xs text-gray-500 font-mono">{new Date().toLocaleDateString()}</p>
       </div>
 

@@ -42,7 +42,7 @@ export function computeSummaries(sessions: StrainSession[]): StrainSummary[] {
 export async function exportExcel(sessions: StrainSession[]) {
   const summaries = computeSummaries(sessions);
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Weight Verification System';
+  wb.creator = 'ScaleSync';
   wb.created = new Date();
 
   // Determine if ANY strain has claimed weight
@@ -64,7 +64,7 @@ export async function exportExcel(sessions: StrainSession[]) {
   const lastCol = String.fromCharCode(64 + colCount); // A=1, B=2, etc.
   ws.mergeCells(`A1:${lastCol}1`);
   const titleCell = ws.getCell('A1');
-  titleCell.value = 'Weight Verification Summary';
+  titleCell.value = 'ScaleSync — Dry Weight Summary';
   titleCell.font = TITLE_FONT;
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(1).height = 30;

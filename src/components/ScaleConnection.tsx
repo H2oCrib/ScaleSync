@@ -92,7 +92,7 @@ export function ScaleConnection({ connected, onConnect, onDisconnect, onDemoMode
         {/* Bottom line */}
         <div className="flex items-center gap-2 mt-12">
           <div className="h-px flex-1 bg-base-700" />
-          <span className="text-[10px] text-gray-700 font-mono uppercase tracking-[0.3em]">Weight Verification</span>
+          <span className="text-[10px] text-gray-700 font-mono uppercase tracking-[0.3em]">ScaleSync</span>
           <div className="h-px flex-1 bg-base-700" />
         </div>
       </div>
