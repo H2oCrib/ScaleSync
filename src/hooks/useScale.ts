@@ -73,10 +73,27 @@ export function useScale(): UseScaleReturn {
   }, []);
 
   const connect = useCallback(async () => {
+    let port: SerialPort | null = null;
     try {
       setError(null);
-      const port = await navigator.serial.requestPort();
-      await port.open(SERIAL_CONFIG);
+      port = await navigator.serial.requestPort();
+
+      // Port may already be open from prior session (tab refresh, HMR, crash).
+      // Attempt open; if InvalidStateError, close and retry once.
+      try {
+        await port.open(SERIAL_CONFIG);
+      } catch (openErr: any) {
+        if (openErr.name === 'InvalidStateError' || /already open/i.test(openErr.message || '')) {
+          console.warn('[scale] port already open, closing and retrying');
+          try { await port.close(); } catch {}
+          // Small delay to let driver release
+          await new Promise(r => setTimeout(r, 200));
+          await port.open(SERIAL_CONFIG);
+        } else {
+          throw openErr;
+        }
+      }
+
       portRef.current = port;
       if (port.writable) writerRef.current = port.writable.getWriter();
       setConnected(true);
@@ -89,7 +106,13 @@ export function useScale(): UseScaleReturn {
         console.log('[scale] test IP sent');
       }
     } catch (e: any) {
-      if (e.name !== 'NotFoundError') setError(`Connection failed: ${e.message}`);
+      if (e.name === 'NotFoundError') return; // user cancelled picker
+      // Clean up partial state on failure
+      try { if (writerRef.current) { writerRef.current.releaseLock(); writerRef.current = null; } } catch {}
+      try { if (port) await port.close(); } catch {}
+      portRef.current = null;
+      setConnected(false);
+      setError(`Connection failed: ${e.message}`);
     }
   }, [startReadLoop]);
 
