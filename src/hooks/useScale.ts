@@ -27,7 +27,8 @@ export function useScale(): UseScaleReturn {
   const bufferRef = useRef('');
 
   const sendCommand = useCallback(async (cmd: string) => {
-    if (!writerRef.current) return;
+    if (!writerRef.current) { console.warn('[scale] no writer, cmd dropped:', JSON.stringify(cmd)); return; }
+    console.log('[scale-cmd]', JSON.stringify(cmd));
     const encoder = new TextEncoder();
     await writerRef.current.write(encoder.encode(cmd));
   }, []);
@@ -51,8 +52,14 @@ export function useScale(): UseScaleReturn {
           bufferRef.current = lines.pop() || '';
           for (const line of lines) {
             if (line.trim()) {
+              console.log('[scale-raw]', JSON.stringify(line));
               const reading = parseWeightResponse(line);
-              if (reading) setCurrentReading(reading);
+              if (reading) {
+                console.log('[scale-parsed]', reading);
+                setCurrentReading(reading);
+              } else {
+                console.warn('[scale-parse-fail]', JSON.stringify(line));
+              }
             }
           }
         }
@@ -74,6 +81,13 @@ export function useScale(): UseScaleReturn {
       if (port.writable) writerRef.current = port.writable.getWriter();
       setConnected(true);
       startReadLoop();
+      // Test communication with single print command
+      console.log('[scale] connected, sending test IP command');
+      if (writerRef.current) {
+        const enc = new TextEncoder();
+        await writerRef.current.write(enc.encode('IP\r\n'));
+        console.log('[scale] test IP sent');
+      }
     } catch (e: any) {
       if (e.name !== 'NotFoundError') setError(`Connection failed: ${e.message}`);
     }

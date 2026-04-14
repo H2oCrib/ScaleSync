@@ -1,17 +1,41 @@
-import { useState } from 'react';
-import type { HarvestBatchConfig, HarvestStrainConfig } from '../lib/types';
+import { useState, useRef } from 'react';
+import type { HarvestBatchConfig, HarvestStrainConfig, HarvestSession } from '../lib/types';
+import { ScannerHowTo } from './ScannerGuide';
+import { parseSessionFile } from '../lib/session-persistence';
 
 interface WetSetupProps {
   onStartWeighing: (config: HarvestBatchConfig) => void;
+  onLoadSession: (session: HarvestSession) => void;
   onBack: () => void;
 }
 
-export function WetSetup({ onStartWeighing, onBack }: WetSetupProps) {
+export function WetSetup({ onStartWeighing, onLoadSession, onBack }: WetSetupProps) {
   const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   const [batchName, setBatchName] = useState(`Harvest ${today}`);
   const [strains, setStrains] = useState<HarvestStrainConfig[]>([]);
   const [strainName, setStrainName] = useState('');
   const [plantCount, setPlantCount] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLoadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoadError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseSessionFile(reader.result as string);
+      if (parsed) {
+        onLoadSession(parsed.harvestSession);
+      } else {
+        setLoadError('Invalid session file');
+        setTimeout(() => setLoadError(null), 3000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
 
   const totalPlants = strains.reduce((sum, s) => sum + s.plantCount, 0);
 
@@ -68,6 +92,37 @@ export function WetSetup({ onStartWeighing, onBack }: WetSetupProps) {
           className="w-full px-3 py-2.5 bg-base-800 border border-base-600 rounded-lg text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-500/50 font-medium text-sm sm:text-base"
           required
         />
+      </div>
+
+      {/* Load Saved Session */}
+      <div className="bg-base-900 border border-base-700 rounded-lg p-3 sm:p-5 mb-3 sm:mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-400">Resume Previous Session</p>
+            <p className="text-[10px] text-gray-600 mt-0.5">Load a saved .json progress file</p>
+          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 sm:px-4 py-2 bg-base-800 hover:bg-base-700 border border-base-600 rounded-lg text-xs text-gray-300 font-medium transition-colors"
+          >
+            Load File
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleLoadFile}
+            className="hidden"
+          />
+        </div>
+        {loadError && (
+          <p className="text-xs text-red-400 mt-2">{loadError}</p>
+        )}
+      </div>
+
+      {/* Scanner Setup & Test — collapsible */}
+      <div className="mb-3 sm:mb-4">
+        <ScannerHowTo />
       </div>
 
       {/* Strains List */}

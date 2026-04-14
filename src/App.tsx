@@ -1,17 +1,18 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useScale } from './hooks/useScale';
 import { ScaleConnection } from './components/ScaleConnection';
 import { ModeSelect } from './components/ModeSelect';
 import { SessionSetup } from './components/SessionSetup';
 import { WeighingStation } from './components/WeighingStation';
 import { VerificationSummary } from './components/VerificationSummary';
-import { ScannerGuide } from './components/ScannerGuide';
+// ScannerHowTo is now embedded in WetSetup — no standalone page
 import { ScannerPortal } from './components/ScannerPortal';
 import { WetSetup } from './components/WetSetup';
 import { WetWeighingStation } from './components/WetWeighingStation';
 import { WetSummary } from './components/WetSummary';
 import { exportExcel } from './lib/export';
 import { exportWetExcel } from './lib/wet-export';
+import { loadSession, clearSession, createDebouncedSave } from './lib/session-persistence';
 import type {
   AppPhase, ScaleReading, StrainConfig, StrainSession, WeightReading,
   WorkflowMode, HarvestBatchConfig, HarvestSession, WetWeightReading,
@@ -46,6 +47,30 @@ function MainApp() {
   const [demoMode, setDemoMode] = useState(false);
   const [demoReading, setDemoReading] = useState<ScaleReading | null>(null);
   const demoIntervalRef = useRef<number | null>(null);
+
+  const [sessionRestored, setSessionRestored] = useState(false);
+
+  const debouncedSave = useMemo(() => createDebouncedSave(300), []);
+
+  // Restore saved session on mount
+  useEffect(() => {
+    const saved = loadSession();
+    if (saved) {
+      setHarvestSession(saved.harvestSession);
+      setWorkflowMode(saved.workflowMode);
+      setPhase(saved.phase);
+      setDemoMode(true); // restored sessions run in demo (no scale connection yet)
+      setSessionRestored(true);
+      setTimeout(() => setSessionRestored(false), 4000);
+    }
+  }, []);
+
+  // Auto-save whenever harvestSession changes
+  useEffect(() => {
+    if (harvestSession && workflowMode) {
+      debouncedSave(harvestSession, workflowMode, phase);
+    }
+  }, [harvestSession, workflowMode, phase, debouncedSave]);
 
   const demoTargetRef = useRef(450);
   const demoTickRef = useRef(0);
@@ -102,12 +127,13 @@ function MainApp() {
     setWorkflowMode(null);
     setHarvestSession(null);
     setPhase('connect');
+    clearSession();
   };
 
   // ── Mode Selection ──
   const handleSelectMode = (mode: WorkflowMode) => {
     setWorkflowMode(mode);
-    setPhase(mode === 'dry' ? 'setup' : 'scannerGuide');
+    setPhase(mode === 'dry' ? 'setup' : 'wetSetup');
   };
 
   // ── Dry Weight Handlers ──
@@ -215,9 +241,16 @@ function MainApp() {
     if (harvestSession) exportWetExcel(harvestSession);
   };
 
+  const handleLoadSession = async (session: HarvestSession) => {
+    setHarvestSession(session);
+    setPhase('wetWeighing');
+    await scale.startContinuous();
+  };
+
   const handleWetNewSession = () => {
     setHarvestSession(null);
     setPhase('modeSelect');
+    clearSession();
   };
 
   const activeSession = sessions[activeSessionIndex];
@@ -258,6 +291,13 @@ function MainApp() {
           )}
         </div>
       </header>
+
+      {/* Session Restored Toast */}
+      {sessionRestored && (
+        <div className="bg-green-500/10 border-b border-green-500/20 px-4 py-2 text-center">
+          <span className="text-xs font-medium text-green-400">Session restored from auto-save</span>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1">
@@ -309,17 +349,11 @@ function MainApp() {
           />
         )}
 
-        {phase === 'scannerGuide' && (
-          <ScannerGuide
-            onContinue={() => setPhase('wetSetup')}
-            onBack={() => setPhase('modeSelect')}
-          />
-        )}
-
         {phase === 'wetSetup' && (
           <WetSetup
             onStartWeighing={handleStartWetWeighing}
-            onBack={() => setPhase('scannerGuide')}
+            onLoadSession={handleLoadSession}
+            onBack={() => setPhase('modeSelect')}
           />
         )}
 
@@ -334,6 +368,8 @@ function MainApp() {
             onZero={demoMode ? async () => {} : scale.zero}
             onStartContinuous={demoMode ? async () => {} : scale.startContinuous}
             onStopContinuous={demoMode ? async () => {} : scale.stopContinuous}
+            workflowMode={workflowMode ?? 'wet'}
+            phase={phase}
           />
         )}
 

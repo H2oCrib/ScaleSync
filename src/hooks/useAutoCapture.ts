@@ -35,13 +35,15 @@ export function useAutoCapture({
       return;
     }
 
-    if (!armed || !currentReading.stable) {
+    if (!armed) {
       stableCountRef.current = 0;
       lastWeightRef.current = weight;
       return;
     }
 
-    if (lastWeightRef.current !== null && Math.abs(weight - lastWeightRef.current) < 0.1) {
+    // Capture based on weight consistency alone — 3 readings within 0.5g
+    // No longer requires scale's stable flag
+    if (lastWeightRef.current !== null && Math.abs(weight - lastWeightRef.current) < 0.5) {
       stableCountRef.current++;
     } else {
       stableCountRef.current = 1;
