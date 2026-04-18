@@ -51,13 +51,20 @@ export function WetWeighingStation({
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [, setTimeTick] = useState(0);
-  const [flash, setFlash] = useState<'success' | 'error' | null>(null);
+  type FlashState =
+    | { kind: 'success'; strain: string; plantNumber: number; total: number; weightGrams: number }
+    | { kind: 'error'; tagId: string }
+    | null;
+  const [flash, setFlash] = useState<FlashState>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const triggerFlash = useCallback((kind: 'success' | 'error') => {
+  const triggerFlash = useCallback((state: Exclude<FlashState, null>) => {
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    setFlash(kind);
-    flashTimerRef.current = setTimeout(() => setFlash(null), kind === 'error' ? 450 : 300);
+    setFlash(state);
+    flashTimerRef.current = setTimeout(
+      () => setFlash(null),
+      state.kind === 'success' ? 1100 : 550,
+    );
   }, []);
 
   useEffect(() => () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current); }, []);
@@ -230,7 +237,13 @@ export function WetWeighingStation({
     setLastRecorded(reading);
     setScannedTag('');
     setAwaitingWeight(false);
-    triggerFlash('success');
+    triggerFlash({
+      kind: 'success',
+      strain: reading.strain,
+      plantNumber: reading.plantNumber,
+      total: totalPlants,
+      weightGrams: reading.weightGrams,
+    });
 
     if (nextPlant >= totalPlants) {
       playComplete();
@@ -252,7 +265,7 @@ export function WetWeighingStation({
     if (isDuplicate) {
       setDuplicateAlert(tagId);
       playError();
-      triggerFlash('error');
+      triggerFlash({ kind: 'error', tagId });
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
     }
@@ -272,7 +285,7 @@ export function WetWeighingStation({
     if (isDuplicate) {
       setDuplicateAlert(tag);
       playError();
-      triggerFlash('error');
+      triggerFlash({ kind: 'error', tagId: tag });
       setTagInput('');
       setTimeout(() => setDuplicateAlert(null), 3000);
       return;
@@ -341,14 +354,37 @@ export function WetWeighingStation({
 
   return (
     <div className="max-w-5xl mx-auto py-2 sm:py-4 px-2 sm:px-4">
-      {/* Full-screen capture flash — green for success, red for duplicate/error */}
+      {/* Full-screen capture flash — green for success (with strain/count), red for duplicate */}
       {flash && (
         <div
           aria-hidden="true"
-          className={`fixed inset-0 pointer-events-none z-40 motion-safe:animate-flash ${
-            flash === 'success' ? 'bg-green-500/30' : 'bg-red-500/35'
+          className={`fixed inset-0 pointer-events-none z-40 flex items-center justify-center ${
+            flash.kind === 'success'
+              ? 'bg-green-500/30 motion-safe:animate-flash-success'
+              : 'bg-red-500/35 motion-safe:animate-flash-error'
           }`}
-        />
+        >
+          {flash.kind === 'success' && (
+            <div className="motion-safe:animate-flash-content text-center px-6 py-5 bg-green-600/90 backdrop-blur-sm border-2 border-green-400 rounded-2xl shadow-2xl">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.25em] text-green-100/80 mb-1">Recorded</p>
+              <p className="text-2xl sm:text-4xl font-bold text-white tracking-tight mb-1 truncate max-w-[80vw]">
+                {flash.strain}
+              </p>
+              <p className="text-base sm:text-xl font-mono text-white/90 tabular-nums">
+                {flash.plantNumber} / {flash.total}
+              </p>
+              <p className="text-xs sm:text-sm font-mono text-green-100/80 mt-1">
+                {flash.weightGrams.toFixed(1)} g
+              </p>
+            </div>
+          )}
+          {flash.kind === 'error' && (
+            <div className="motion-safe:animate-flash-content text-center px-5 py-3 bg-red-600/90 backdrop-blur-sm border-2 border-red-400 rounded-xl shadow-2xl">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.25em] text-red-100/80 mb-0.5">Duplicate</p>
+              <p className="text-sm sm:text-base font-mono text-white truncate max-w-[70vw]">{flash.tagId}</p>
+            </div>
+          )}
+        </div>
       )}
       {/* Header */}
       <div className="flex justify-between items-start mb-2 sm:mb-4">
