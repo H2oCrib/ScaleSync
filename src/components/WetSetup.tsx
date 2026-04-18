@@ -2,14 +2,39 @@ import { useState, useRef } from 'react';
 import type { HarvestBatchConfig, HarvestStrainConfig, HarvestSession } from '../lib/types';
 import { ScannerHowTo } from './ScannerGuide';
 import { parseSessionFile } from '../lib/session-persistence';
+import { cloudEnabled } from '../lib/supabase';
+
+export type SaveMode = 'local' | 'cloud';
+
+const SAVE_MODE_KEY = 'scalesync-save-mode';
+
+function readStoredSaveMode(): SaveMode {
+  try {
+    const raw = localStorage.getItem(SAVE_MODE_KEY);
+    if (raw === 'cloud' || raw === 'local') return raw;
+  } catch {
+    // fall through
+  }
+  return 'local';
+}
 
 interface WetSetupProps {
-  onStartWeighing: (config: HarvestBatchConfig) => void;
+  onStartWeighing: (config: HarvestBatchConfig, saveMode: SaveMode) => void;
   onLoadSession: (session: HarvestSession) => void;
   onBack: () => void;
 }
 
 export function WetSetup({ onStartWeighing, onLoadSession, onBack }: WetSetupProps) {
+  const [saveMode, setSaveMode] = useState<SaveMode>(() => {
+    const stored = readStoredSaveMode();
+    return cloudEnabled ? stored : 'local';
+  });
+
+  const chooseMode = (mode: SaveMode) => {
+    if (mode === 'cloud' && !cloudEnabled) return;
+    setSaveMode(mode);
+    try { localStorage.setItem(SAVE_MODE_KEY, mode); } catch { /* ignore */ }
+  };
   const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   const [batchName, setBatchName] = useState(`Harvest ${today}`);
   const [strains, setStrains] = useState<HarvestStrainConfig[]>([]);
@@ -94,7 +119,7 @@ export function WetSetup({ onStartWeighing, onLoadSession, onBack }: WetSetupPro
       batchName: batchName.trim(),
       strains,
       date: new Date(),
-    });
+    }, saveMode);
   };
 
   return (
@@ -123,6 +148,54 @@ export function WetSetup({ onStartWeighing, onLoadSession, onBack }: WetSetupPro
           className="w-full px-3 py-2.5 bg-base-800 border border-base-600 rounded-lg text-gray-100 placeholder-gray-600 focus:outline-none focus:border-green-500/50 font-medium text-sm sm:text-base"
           required
         />
+      </div>
+
+      {/* Save destination */}
+      <div className="bg-base-900 border border-base-700 rounded-lg p-3 sm:p-5 mb-3 sm:mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-widest text-gray-500 mb-0.5">Save To</p>
+            <p className="text-[10px] text-gray-600">
+              {saveMode === 'cloud'
+                ? 'Local + Supabase. Works offline, syncs when online.'
+                : 'This browser only. Export or save file to back up.'}
+              {!cloudEnabled && (
+                <span className="ml-2 text-amber-500/80">Cloud disabled — no credentials configured.</span>
+              )}
+            </p>
+          </div>
+          <div role="tablist" aria-label="Save destination" className="inline-flex rounded-lg border border-base-600 bg-base-800 p-0.5 shrink-0">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={saveMode === 'local'}
+              onClick={() => chooseMode('local')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                saveMode === 'local'
+                  ? 'bg-green-600 text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Local Only
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={saveMode === 'cloud'}
+              onClick={() => chooseMode('cloud')}
+              disabled={!cloudEnabled}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                saveMode === 'cloud'
+                  ? 'bg-green-600 text-white'
+                  : cloudEnabled
+                    ? 'text-gray-400 hover:text-gray-200'
+                    : 'text-gray-700 cursor-not-allowed'
+              }`}
+            >
+              Sync to Cloud
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Load Saved Session */}

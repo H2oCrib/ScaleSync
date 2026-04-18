@@ -14,6 +14,9 @@ import { UserGuide } from './components/UserGuide';
 import { exportExcel } from './lib/export';
 import { exportWetExcel } from './lib/wet-export';
 import { loadSession, clearSession, createDebouncedSave, peekSession } from './lib/session-persistence';
+import { enqueue as enqueueCloudOp, startFlushWorker } from './lib/outbox';
+import { getDeviceId } from './lib/device-id';
+import type { SaveMode } from './components/WetSetup';
 import type {
   AppPhase, ScaleReading, StrainConfig, StrainSession, WeightReading,
   WorkflowMode, HarvestBatchConfig, HarvestSession, WetWeightReading,
@@ -64,6 +67,9 @@ function MainApp() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [pendingResume, setPendingResume] = useState<ReturnType<typeof peekSession>>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveMode, setSaveMode] = useState<SaveMode>('local');
+  const deviceIdRef = useRef<string>('');
+  if (!deviceIdRef.current) deviceIdRef.current = getDeviceId();
 
   // Global ? shortcut to open guide
   useEffect(() => {
@@ -88,6 +94,12 @@ function MainApp() {
     if (meta && meta.recorded > 0 && meta.recorded < meta.total) {
       setPendingResume(meta);
     }
+  }, []);
+
+  // Start cloud outbox flush worker once. No-op if cloud is disabled.
+  useEffect(() => {
+    const stop = startFlushWorker();
+    return stop;
   }, []);
 
   const handleResumeSession = () => {
@@ -259,9 +271,20 @@ function MainApp() {
   };
 
   // ── Wet Weight Handlers ──
-  const handleStartWetWeighing = async (config: HarvestBatchConfig) => {
-    setHarvestSession({ config, readings: [], completed: false });
+  const handleStartWetWeighing = async (config: HarvestBatchConfig, mode: SaveMode = 'local') => {
+    const session: HarvestSession = { config, readings: [], completed: false };
+    setHarvestSession(session);
+    setSaveMode(mode);
     setPhase('wetWeighing');
+    if (mode === 'cloud') {
+      enqueueCloudOp({
+        kind: 'pushHarvest',
+        opId: crypto.randomUUID(),
+        session,
+        workflowMode: 'wet',
+        deviceId: deviceIdRef.current,
+      });
+    }
     await scale.startContinuous();
   };
 
@@ -275,7 +298,17 @@ function MainApp() {
       demoTargetRef.current = 300 + Math.random() * 300;
       demoTickRef.current = 0;
     }
-  }, [demoMode]);
+    // Fire-and-forget cloud push — never blocks capture.
+    if (saveMode === 'cloud' && harvestSession) {
+      enqueueCloudOp({
+        kind: 'pushReadings',
+        opId: crypto.randomUUID(),
+        harvestId: harvestSession.config.id,
+        readings: [reading],
+        deviceId: deviceIdRef.current,
+      });
+    }
+  }, [demoMode, saveMode, harvestSession]);
 
   const handleUpdateWetReadings = useCallback((readings: WetWeightReading[]) => {
     setHarvestSession(prev => prev ? { ...prev, readings } : prev);
@@ -285,6 +318,13 @@ function MainApp() {
     await scale.stopContinuous();
     setHarvestSession(prev => prev ? { ...prev, completed: true } : prev);
     setPhase('wetSummary');
+    if (saveMode === 'cloud' && harvestSession) {
+      enqueueCloudOp({
+        kind: 'markCompleted',
+        opId: crypto.randomUUID(),
+        harvestId: harvestSession.config.id,
+      });
+    }
   };
 
   const handleWetExport = () => {
