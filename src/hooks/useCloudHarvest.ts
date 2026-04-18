@@ -54,7 +54,6 @@ export function useCloudHarvest({
     const channel = supabase
       .channel(`harvest:${harvestId}`)
       .on(
-        // @ts-expect-error — supabase-js infers this event name but TS sometimes narrows it too aggressively
         'postgres_changes',
         {
           event: 'INSERT',
