@@ -11,9 +11,12 @@ Two workflows:
 ```bash
 git clone git@github.com:H2oCrib/ScaleSync.git
 cd ScaleSync
+nvm use            # picks Node 20 from .nvmrc (skip if you already have Node 18+)
 npm install
 npm run dev
 ```
+
+Node 18+ is enforced via `engines` in `package.json` (with `engine-strict=true` in `.npmrc`), so `npm install` fails fast on older Node. Don't have nvm? Install from [nvm-sh/nvm](https://github.com/nvm-sh/nvm), or grab Node 20 LTS directly from [nodejs.org](https://nodejs.org/).
 
 Open **http://localhost:5173** in **Chrome** (Web Serial API is required for the scale connection).
 
