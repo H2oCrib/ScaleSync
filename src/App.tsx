@@ -289,6 +289,11 @@ function MainApp() {
     });
   }, [activeSessionIndex]);
 
+  const handleSwitchStrain = useCallback((index: number) => {
+    if (index < 0 || index >= sessions.length) return;
+    setActiveSessionIndex(index);
+  }, [sessions.length]);
+
   const handleFinishStrain = async () => {
     setSessions(prev => {
       const updated = [...prev];
@@ -573,6 +578,9 @@ function MainApp() {
         {phase === 'weighing' && activeSession && (
           <WeighingStation
             session={activeSession}
+            sessions={sessions}
+            activeSessionIndex={activeSessionIndex}
+            onSwitchStrain={handleSwitchStrain}
             currentReading={demoMode ? demoReading : scale.currentReading}
             onRecordWeight={handleRecordWeight}
             onUpdateReadings={handleUpdateReadings}

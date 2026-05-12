@@ -7,6 +7,9 @@ import { WeightGrid } from './WeightGrid';
 
 interface WeighingStationProps {
   session: StrainSession;
+  sessions: StrainSession[];
+  activeSessionIndex: number;
+  onSwitchStrain: (index: number) => void;
   currentReading: ScaleReading | null;
   onRecordWeight: (reading: WeightReading) => void;
   onUpdateReadings: (readings: WeightReading[]) => void;
@@ -19,6 +22,9 @@ interface WeighingStationProps {
 
 export function WeighingStation({
   session,
+  sessions,
+  activeSessionIndex,
+  onSwitchStrain,
   currentReading,
   onRecordWeight,
   onUpdateReadings,
@@ -144,6 +150,32 @@ export function WeighingStation({
               <>{itemLabel} {Math.min(nextItem, fullUnits)} of {fullUnits}{partialCount > 0 && ` + ${partialCount} partials`}</>
             )}
           </p>
+          {sessions.length > 1 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {sessions.map((s, i) => {
+                const active = i === activeSessionIndex;
+                const completed = s.completed;
+                return (
+                  <button
+                    key={s.config.id}
+                    onClick={() => onSwitchStrain(i)}
+                    className={`px-3 py-2 rounded-lg border transition-colors text-sm ${
+                      active
+                        ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
+                        : completed
+                          ? 'bg-base-900 border-base-800 text-gray-500'
+                          : 'bg-base-800 border-base-600 text-gray-400'
+                    }`}
+                  >
+                    {s.config.strain}
+                    <span className="ml-1.5 text-[10px] sm:text-xs font-mono opacity-70">
+                      {s.readings.length}/{s.config.totalUnits}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={onTare} className="px-3 py-1.5 bg-base-800 hover:bg-base-700 border border-base-600 rounded text-xs text-gray-400 transition-colors">
